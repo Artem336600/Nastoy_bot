@@ -1,7 +1,7 @@
 from typing import Optional, Dict, Any
 
 from .supabase_client import get_supabase
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 def user_is_admin(username: Optional[str]) -> bool:
@@ -181,7 +181,7 @@ def register_user_for_event(username: Optional[str], event_id: int) -> bool:
             existing_record = existing_resp.data[0]
             supabase.table("event_registrations").update({
                 "status": "registered",
-                "registration_date": "NOW()"
+                "registration_date": datetime.utcnow().isoformat()
             }).eq("id", existing_record["id"]).execute()
         else:
             # Создаём новую запись
@@ -424,7 +424,7 @@ def add_user_to_waitlist(username: Optional[str], event_id: int) -> bool:
             existing_record = existing_resp.data[0]
             supabase.table("event_registrations").update({
                 "status": "waitlist",
-                "registration_date": "NOW()"
+                "registration_date": datetime.utcnow().isoformat()
             }).eq("id", existing_record["id"]).execute()
         else:
             # Создаём новую запись
@@ -521,7 +521,7 @@ def get_event_participants(event_id: int) -> list:
         registered_resp = (
             supabase
             .table("event_registrations")
-            .select("user_tg_username, registration_date, status")
+            .select("user_tg_username, registration_date, status, users(chat_id)")
             .eq("event_id", event_id)
             .in_("status", ["registered", "waitlist"])
             .order("registration_date", desc=False)
@@ -534,7 +534,8 @@ def get_event_participants(event_id: int) -> list:
                 participants.append({
                     "username": record["user_tg_username"],
                     "status": record["status"],
-                    "registration_date": record["registration_date"]
+                    "registration_date": record["registration_date"],
+                    "chat_id": (record.get("users") or {}).get("chat_id") if isinstance(record.get("users"), dict) else None
                 })
         
         return participants
@@ -573,6 +574,21 @@ def get_user_registrations_count(username: str) -> int:
     if not username:
         return 0
 
+    tg_username = username if username.startswith("@") else f"@{username}"
+    supabase = get_supabase()
+    try:
+        resp = (
+            supabase
+            .table("event_registrations")
+            .select("id", count="exact")
+            .eq("user_tg_username", tg_username)
+            .eq("status", "registered")
+            .execute()
+        )
+        return resp.count or 0
+    except Exception as e:
+        print(f"ERROR getting user registrations count: {e}")
+        return 0
 
 def get_user_events_history(username: str) -> list[Dict[str, Any]]:
     """История мероприятий пользователя (по таблице event_registrations)"""
@@ -593,23 +609,6 @@ def get_user_events_history(username: str) -> list[Dict[str, Any]]:
     except Exception as e:
         print(f"ERROR get_user_events_history: {e}")
         return []
-    
-    tg_username = username if username.startswith("@") else f"@{username}"
-    supabase = get_supabase()
-    try:
-        resp = (
-            supabase
-            .table("event_registrations")
-            .select("id", count="exact")
-            .eq("user_tg_username", tg_username)
-            .eq("status", "registered")
-            .execute()
-        )
-        
-        return resp.count or 0
-    except Exception as e:
-        print(f"ERROR getting user registrations count: {e}")
-        return 0
 
 
 def is_user_in_event_blacklist(event_id: int, username: str) -> bool:
@@ -730,29 +729,7 @@ def get_event_blacklist(event_id: int) -> list:
         return []
 
 
-def get_user_chat_id(username: str) -> Optional[int]:
-    """Получает chat_id пользователя для отправки уведомлений"""
-    if not username:
-        return None
-    
-    tg_username = username if username.startswith("@") else f"@{username}"
-    supabase = get_supabase()
-    try:
-        resp = (
-            supabase
-            .table("users")
-            .select("chat_id")
-            .eq("tg_username", tg_username)
-            .limit(1)
-            .execute()
-        )
-        
-        if resp.data and len(resp.data) > 0:
-            return resp.data[0].get("chat_id")
-        return None
-    except Exception as e:
-        print(f"ERROR getting user chat_id: {e}")
-        return None
+ 
 
 
 def get_all_users() -> list[Dict[str, Any]]:
@@ -826,6 +803,22 @@ def get_global_blacklist() -> list[Dict[str, Any]]:
 def get_admin_past_events(admin_tg: str) -> list[Dict[str, Any]]:
     """Возвращает прошедшие мероприятия, где указанный админ фигурирует в поле responsible"""
     if not admin_tg:
+        return []
+    tg = admin_tg if admin_tg.startswith("@") else f"@{admin_tg}"
+    supabase = get_supabase()
+    try:
+        resp = (
+            supabase
+            .table("events")
+            .select("*")
+            .eq("is_completed", True)
+            .ilike("responsible", f"%{tg}%")
+            .order("date", desc=True)
+            .execute()
+        )
+        return resp.data or []
+    except Exception as e:
+        print(f"ERROR get_admin_past_events: {e}")
         return []
 
 
@@ -954,21 +947,6 @@ def create_board_game(payload: Dict[str, Any]) -> bool:
     except Exception as e:
         print(f"ERROR create_board_game: {e}")
         return False
-    supabase = get_supabase()
-    try:
-        resp = (
-            supabase
-            .table("events")
-            .select("*")
-            .eq("is_completed", True)
-            .ilike("responsible", f"%{admin_tg}%")
-            .order("date", desc=True)
-            .execute()
-        )
-        return resp.data or []
-    except Exception as e:
-        print(f"ERROR get_admin_past_events: {e}")
-        return []
 
 
 def save_event_feedback_rating(username: Optional[str], event_id: int, rating: int) -> bool:

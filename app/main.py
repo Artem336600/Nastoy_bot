@@ -6,7 +6,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from .config import BOT_TOKEN, validate_config
 from .routers.start import router as start_router
 from .routers.events import router as events_router
-from .utils import get_events_needing_reminders, mark_event_reminder_sent, get_event_participants, get_user_chat_id
+from .utils import get_events_needing_reminders, mark_event_reminder_sent, get_event_participants
 
 
 async def run() -> None:
@@ -43,12 +43,13 @@ async def run() -> None:
 					try:
 						participants = get_event_participants(event_id)
 						for p in participants:
-							chat_id = get_user_chat_id(p.get("username"))
-							if chat_id:
-								try:
-									await bot.send_message(chat_id=chat_id, text=text)
-								except Exception as e:
-									print(f"ERROR send reminder to {p.get('username')}: {e}")
+							chat_id = p.get("chat_id")
+							if not chat_id:
+								continue
+							try:
+								await bot.send_message(chat_id=chat_id, text=text)
+							except Exception as e:
+								print(f"ERROR send reminder to {p.get('username')}: {e}")
 					except Exception as e:
 						print(f"ERROR fetching participants for reminder: {e}")
 					mark_event_reminder_sent(event_id, reminder_type)

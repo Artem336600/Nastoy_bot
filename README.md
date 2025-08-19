@@ -7,19 +7,51 @@
 ### Как создать таблицы в Supabase
 1) Откройте Supabase → Project → SQL Editor.
 2) Вставьте содержимое файла `supabase_schema.sql` и выполните.
-3) В таблицу `admin` вручную добавляйте TG-ник в колонку `tg_username` в формате `@my_admin_nick`.
+3) В таблицу `admin` вручную добавляйте TG-ник в колонку `tg` в формате `@my_admin_nick`.
 
-Примечание: проверка админа идёт по колонке `tg_username` (формат `@username`). Если у пользователя нет username, он будет считаться обычным пользователем.
+Примечание: проверка админа идёт по колонке `tg` (формат `@username`). Если у пользователя нет username, он будет считаться обычным пользователем.
 
-### Запуск локально (Windows PowerShell)
+### Структура проекта (по образцу BAS Media Bot)
+
+```
+.
+├── deployment/
+│   ├── docker-compose.yaml
+│   └── bot.env
+├── docs/
+│   └── README.md
+├── migrations/
+├── script/
+├── src/
+│   └── run.py
+├── app/
+│   ├── main.py
+│   ├── config.py
+│   ├── supabase_client.py
+│   ├── keyboards.py
+│   ├── states.py
+│   └── routers/
+│       ├── __init__.py
+│       ├── start.py
+│       └── events.py
+├── requirements.txt
+└── bot.py
+```
+
+### Запуск
+
+- Вариант 1: локально
 ```powershell
-cd "C:\\Users\\Артём\\Desktop\\test1"
 py -3 -m venv .venv
 ./.venv/Scripts/python -m pip install --upgrade pip
 ./.venv/Scripts/pip install -r requirements.txt
-./.venv/Scripts/python bot.py
+./.venv/Scripts/python -m src.run
 ```
 
-После запуска нажмите /start в боте. Он ответит «Вы админ» или «Вы пользователь».
+- Вариант 2: через docker-compose
+```bash
+cd deployment
+docker compose up --build
+```
 
 
