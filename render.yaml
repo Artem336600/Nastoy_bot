@@ -1,0 +1,16 @@
+services:
+  - type: worker
+    name: nastoy-bot
+    env: python
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m src.run
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"
