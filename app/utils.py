@@ -907,11 +907,24 @@ def get_events_needing_reminders() -> list[Dict[str, Any]]:
             dt = parse_event_datetime_to_datetime(date_text) if date_text else None
             if not dt:
                 continue
-            # 1 день
-            if not e.get("reminder_1day_sent") and 0 <= (dt - now).total_seconds() <= 24*3600 + 60:
+            # Сужаем окно отправки, чтобы триггер происходил только один раз в узком интервале
+            diff_seconds = (dt - now).total_seconds()
+            day_target = 24 * 3600
+            hour_target = 3600
+            tolerance = 60  # секунды допуска
+
+            # 1 день до события
+            if (
+                not e.get("reminder_1day_sent")
+                and (day_target - tolerance) <= diff_seconds <= (day_target + tolerance)
+            ):
                 results.append({"event": e, "type": "1day"})
-            # 1 час
-            if not e.get("reminder_1hour_sent") and 0 <= (dt - now).total_seconds() <= 3600 + 60:
+
+            # 1 час до события
+            if (
+                not e.get("reminder_1hour_sent")
+                and (hour_target - tolerance) <= diff_seconds <= (hour_target + tolerance)
+            ):
                 results.append({"event": e, "type": "1hour"})
     except Exception as ex:
         print(f"ERROR get_events_needing_reminders: {ex}")
